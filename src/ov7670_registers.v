@@ -18,10 +18,10 @@ module ov7670_registers #(
 
         case (index)
             5'd0:  reg_word = 16'h1280; // COM7  : reset register
-            5'd1:  reg_word = 16'h1204; // COM7  : RGB output
+            5'd1:  reg_word = 16'h1214; // COM7  : QVGA + RGB output
             5'd2:  reg_word = 16'h1101; // CLKRC : แบ่ง clock ภายในแบบง่าย
-            5'd3:  reg_word = 16'h0C04; // COM3  : enable scaling
-            5'd4:  reg_word = 16'h3E19; // COM14 : enable manual scaling + PCLK divide by 4
+            5'd3:  reg_word = 16'h0C0C; // COM3  : enable scaling + DCW
+            5'd4:  reg_word = 16'h3E1A; // COM14 : manual scaling + DCW/PCLK + divide by 4
             5'd5:  reg_word = 16'h40D0; // COM15 : RGB565 + full output range
             5'd6:  reg_word = 16'h3A04; // TSLB  : ใช้ลำดับข้อมูลมาตรฐานสำหรับ RGB path
             5'd7:  reg_word = 16'h8C00; // RGB444: ปิด RGB444 mode เพื่อใช้ RGB565

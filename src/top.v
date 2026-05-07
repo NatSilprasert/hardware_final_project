@@ -30,6 +30,7 @@ module top (
     wire        cam_frame_start;
     wire [16:0] vga_frame_addr;
     wire [11:0] fb_pixel_data;
+    wire [11:0] filtered_pixel_data;
     wire        vga_active_raw;
     wire        vga_hsync_raw;
     wire        vga_vsync_raw;
@@ -38,17 +39,22 @@ module top (
     wire [8:0]  image_x;
     wire [8:0]  image_y;
 
-    reg         vga_active_d;
-    reg         vga_hsync_d;
-    reg         vga_vsync_d;
+    reg         vga_active_d1;
+    reg         vga_hsync_d1;
+    reg         vga_vsync_d1;
+    reg         vga_active_d2;
+    reg         vga_hsync_d2;
+    reg         vga_vsync_d2;
+    reg [9:0]   vga_x_d1;
+    reg [9:0]   vga_y_d1;
     reg [11:0]  vga_rgb_d;
     reg         frame_seen_latched;
 
     assign sys_rst      = btnC;
     assign cam_pwdn     = 1'b0;
     assign cam_reset_n  = 1'b1;
-    assign Hsync        = vga_hsync_d;
-    assign Vsync        = vga_vsync_d;
+    assign Hsync        = vga_hsync_d2;
+    assign Vsync        = vga_vsync_d2;
     assign vgaRed       = vga_rgb_d[11:8];
     assign vgaGreen     = vga_rgb_d[7:4];
     assign vgaBlue      = vga_rgb_d[3:0];
@@ -112,6 +118,17 @@ module top (
         .frame_addr(vga_frame_addr)
     );
 
+    filter_core u_filter_core (
+        .clk(vga_clk),
+        .rst(sys_rst),
+        .mode(sw),
+        .pixel_valid(vga_active_d1 && config_done),
+        .pixel_x(vga_x_d1),
+        .pixel_y(vga_y_d1),
+        .pixel_in(fb_pixel_data),
+        .pixel_out(filtered_pixel_data)
+    );
+
     always @(posedge cam_pclk) begin
         if (sys_rst) begin
             frame_seen_latched <= 1'b0;
@@ -123,18 +140,30 @@ module top (
 
     always @(posedge vga_clk) begin
         if (sys_rst) begin
-            vga_active_d <= 1'b0;
-            vga_hsync_d  <= 1'b1;
-            vga_vsync_d  <= 1'b1;
+            vga_active_d1 <= 1'b0;
+            vga_hsync_d1  <= 1'b1;
+            vga_vsync_d1  <= 1'b1;
+            vga_active_d2 <= 1'b0;
+            vga_hsync_d2  <= 1'b1;
+            vga_vsync_d2  <= 1'b1;
+            vga_x_d1      <= 10'd0;
+            vga_y_d1      <= 10'd0;
             vga_rgb_d    <= 12'h000;
         end else begin
-            // ชดเชย latency ของ frame buffer ฝั่งอ่าน 1 clock
-            vga_active_d <= vga_active_raw;
-            vga_hsync_d  <= vga_hsync_raw;
-            vga_vsync_d  <= vga_vsync_raw;
+            // stage 1: ชดเชย latency ของ frame buffer
+            vga_active_d1 <= vga_active_raw;
+            vga_hsync_d1  <= vga_hsync_raw;
+            vga_vsync_d1  <= vga_vsync_raw;
+            vga_x_d1      <= vga_x;
+            vga_y_d1      <= vga_y;
 
-            if (vga_active_raw && config_done) begin
-                vga_rgb_d <= fb_pixel_data;
+            // stage 2: ชดเชย latency ของ filter_core
+            vga_active_d2 <= vga_active_d1;
+            vga_hsync_d2  <= vga_hsync_d1;
+            vga_vsync_d2  <= vga_vsync_d1;
+
+            if (vga_active_d2 && config_done) begin
+                vga_rgb_d <= filtered_pixel_data;
             end else begin
                 vga_rgb_d <= 12'h000;
             end
