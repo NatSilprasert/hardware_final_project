@@ -23,7 +23,7 @@ module top (
     wire        vga_clk;
     wire        config_done;
     wire        sccb_busy;
-    wire [5:0]  sccb_index;
+    wire [7:0]  sccb_index;
     wire [16:0] cam_pixel_addr;
     wire [11:0] cam_pixel_data;
     wire        cam_pixel_valid;

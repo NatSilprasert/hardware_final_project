@@ -18,5 +18,6 @@
 ## ข้อจำกัดของเวอร์ชันนี้
 
 - `sccb_master` ยังไม่ได้ตรวจ ACK จริงจังจากกล้อง
-- register set ปรับเป็น baseline RGB565/QVGA ที่ครบขึ้นแล้ว โดยเพิ่ม color matrix, AGC/AWB และ scaling/window register เพื่อให้ stream สีจาก OV7670 นิ่งขึ้น
+- register set ปรับตาม Vivado reference ที่ภาพขึ้นถูกใน `project_1.srcs 2` โดยใช้ RGB565/QVGA table แบบ 165 writes
+- `camera_capture` sample ที่ `posedge PCLK` และนับ address ทุก 320 pixel เอง เพื่อลดปัญหา frame หลุดเมื่อ timing ของ `HREF` ไม่ตรงกับความกว้างที่ต้องการ
 - ยังไม่มี top module, frame buffer, VGA, หรือ filters
