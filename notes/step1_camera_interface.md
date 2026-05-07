@@ -18,5 +18,5 @@
 ## ข้อจำกัดของเวอร์ชันนี้
 
 - `sccb_master` ยังไม่ได้ตรวจ ACK จริงจังจากกล้อง
-- register set เป็น baseline ที่ตั้งใจให้เริ่มต้นง่ายก่อน
+- register set ปรับเป็น baseline RGB565/QVGA ที่ครบขึ้นแล้ว โดยเพิ่ม color matrix, AGC/AWB และ scaling/window register เพื่อให้ stream สีจาก OV7670 นิ่งขึ้น
 - ยังไม่มี top module, frame buffer, VGA, หรือ filters

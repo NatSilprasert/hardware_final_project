@@ -29,7 +29,8 @@ module tb_camera_capture;
         input [7:0] value;
         begin
             cam_data = value;
-            @(posedge pclk);
+            @(negedge pclk);
+            #1;
         end
     endtask
 
@@ -46,20 +47,21 @@ module tb_camera_capture;
         // สร้างขอบขึ้นของ VSYNC เพื่อเริ่ม frame ใหม่
         @(posedge pclk);
         vsync = 1'b1;
-        @(posedge pclk);
-        vsync = 1'b0;
-
+        @(negedge pclk);
+        #1;
         if (!frame_start) begin
             $display("ERROR: frame_start was not asserted");
             $finish;
         end
+        @(posedge pclk);
+        vsync = 1'b0;
 
         href = 1'b1;
 
         // pixel 0: RGB565 = F800 -> RGB444 = F00
         send_byte(8'hF8);
         send_byte(8'h00);
-        @(negedge pclk);
+        @(posedge pclk);
         if (!pixel_valid || pixel_addr != 17'd0 || pixel_data != 12'hF00) begin
             $display("ERROR: pixel 0 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
             $finish;
@@ -68,7 +70,7 @@ module tb_camera_capture;
         // pixel 1: RGB565 = 07E0 -> RGB444 = 0F0
         send_byte(8'h07);
         send_byte(8'hE0);
-        @(negedge pclk);
+        @(posedge pclk);
         if (!pixel_valid || pixel_addr != 17'd1 || pixel_data != 12'h0F0) begin
             $display("ERROR: pixel 1 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
             $finish;
@@ -82,7 +84,7 @@ module tb_camera_capture;
         href = 1'b1;
         send_byte(8'h00);
         send_byte(8'h1F); // pixel ใหม่เป็นน้ำเงิน
-        @(negedge pclk);
+        @(posedge pclk);
         if (!pixel_valid || pixel_addr != 17'd320 || pixel_data != 12'h00F) begin
             $display("ERROR: next-row pixel mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
             $finish;

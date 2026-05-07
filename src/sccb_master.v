@@ -2,7 +2,7 @@ module sccb_master #(
     parameter CLK_DIVIDER  = 500,
     parameter START_DELAY  = 30000,
     parameter RESET_DELAY  = 30000,
-    parameter REG_COUNT    = 20,
+    parameter REG_COUNT    = 52,
     parameter SLAVE_ADDR_W = 8'h42
 ) (
     input  wire       clk,
@@ -11,7 +11,7 @@ module sccb_master #(
     inout  wire       sda,
     output reg        config_done,
     output reg        busy,
-    output reg [4:0]  current_index
+    output reg [5:0]  current_index
 );
 
     localparam ST_POWERUP      = 4'd0;
@@ -63,7 +63,7 @@ module sccb_master #(
             sda_drive_low   <= 1'b0;
             config_done     <= 1'b0;
             busy            <= 1'b1;
-            current_index   <= 5'd0;
+            current_index   <= 6'd0;
             latched_is_reset <= 1'b0;
         end else begin
             case (state)

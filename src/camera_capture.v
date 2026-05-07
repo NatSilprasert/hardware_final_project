@@ -29,7 +29,9 @@ module camera_capture #(
     assign g6 = {first_byte[2:0], cam_data[7:5]};
     assign b5 = cam_data[4:0];
 
-    always @(posedge pclk) begin
+    // OV7670 มักทำให้ข้อมูลนิ่งหลังขอบตกของ PCLK
+    // เลยเลือก sample ที่ขอบลงเพื่อลดอาการอ่านกลางช่วงเปลี่ยนค่า
+    always @(negedge pclk) begin
         if (rst) begin
             pixel_addr  <= 17'd0;
             pixel_data  <= 12'd0;

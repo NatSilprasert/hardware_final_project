@@ -7,7 +7,7 @@ module tb_sccb_master;
     wire sda;
     wire config_done;
     wire busy;
-    wire [4:0] current_index;
+    wire [5:0] current_index;
 
     reg sda_slave_drive;
     reg sda_slave_value;
@@ -19,7 +19,7 @@ module tb_sccb_master;
         .CLK_DIVIDER(2),
         .START_DELAY(4),
         .RESET_DELAY(4),
-        .REG_COUNT(20)
+        .REG_COUNT(52)
     ) dut (
         .clk(clk),
         .rst(rst),
@@ -42,7 +42,7 @@ module tb_sccb_master;
         rst = 1'b0;
 
         // testbench นี้เช็กว่าระบบวิ่งจน config_done ได้
-        repeat (5000) @(posedge clk) begin
+        repeat (20000) @(posedge clk) begin
             if (config_done) begin
                 $display("PASS: tb_sccb_master index=%0d busy=%0b", current_index, busy);
                 $finish;
