@@ -19,6 +19,7 @@ module camera_capture #(
     reg [9:0]  x_count;
     reg [8:0]  y_count;
     reg        vsync_d;
+    reg        href_d;
 
     wire [4:0] r5;
     wire [5:0] g6;
@@ -39,11 +40,13 @@ module camera_capture #(
             x_count     <= 10'd0;
             y_count     <= 9'd0;
             vsync_d     <= 1'b0;
+            href_d      <= 1'b0;
         end else begin
             // ค่า pulse ให้เป็น 1 แค่ clock เดียว
             pixel_valid <= 1'b0;
             frame_start <= 1'b0;
             vsync_d     <= vsync;
+            href_d      <= href;
 
             // ใช้ขอบขึ้นของ VSYNC เป็นจุดเริ่ม frame ใหม่
             if (~vsync_d && vsync) begin
@@ -59,28 +62,33 @@ module camera_capture #(
                     byte_phase <= 1'b1;
                 end else begin
                     byte_phase  <= 1'b0;
-                    pixel_valid <= 1'b1;
 
-                    // แปลง RGB565 -> RGB444 เพื่อลดการใช้ BRAM
-                    pixel_data[11:8] <= r5[4:1];
-                    pixel_data[7:4]  <= g6[5:2];
-                    pixel_data[3:0]  <= b5[4:1];
+                    // เขียนเฉพาะพิกเซลที่ยังอยู่ในกรอบ 320x240
+                    if ((x_count < FRAME_WIDTH) && (y_count < FRAME_HEIGHT)) begin
+                        pixel_valid <= 1'b1;
 
-                    pixel_addr <= (y_count * FRAME_WIDTH) + x_count;
+                        // แปลง RGB565 -> RGB444 เพื่อลดการใช้ BRAM
+                        pixel_data[11:8] <= r5[4:1];
+                        pixel_data[7:4]  <= g6[5:2];
+                        pixel_data[3:0]  <= b5[4:1];
+                        pixel_addr       <= (y_count * FRAME_WIDTH) + x_count;
+                    end
 
-                    if (x_count == FRAME_WIDTH - 1) begin
-                        x_count <= 10'd0;
-                        if (y_count != FRAME_HEIGHT - 1) begin
-                            y_count <= y_count + 1'b1;
-                        end
-                    end else begin
+                    // นับตำแหน่งในแถวตาม stream จริงจากกล้อง
+                    if (x_count != FRAME_WIDTH) begin
                         x_count <= x_count + 1'b1;
                     end
                 end
-            end else begin
-                // ถ้าออกจาก HREF กลาง pixel ให้เริ่มจับ byte ใหม่ในแถวถัดไป
+            end else if (href_d && ~href) begin
+                // ใช้ขอบตกของ HREF เป็นตัวจบแถวจริงจากกล้อง
                 byte_phase <= 1'b0;
                 x_count    <= 10'd0;
+                if (y_count < FRAME_HEIGHT) begin
+                    y_count <= y_count + 1'b1;
+                end
+            end else begin
+                // ตอน blanking ให้คง state frame ไว้ แต่ไม่ถือ byte ค้าง
+                byte_phase <= 1'b0;
             end
         end
     end

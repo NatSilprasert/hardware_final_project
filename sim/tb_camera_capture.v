@@ -76,6 +76,20 @@ module tb_camera_capture;
 
         href = 1'b0;
         @(posedge pclk);
+        @(posedge pclk);
+
+        // ขอบตกของ HREF ควรทำให้ไปแถวถัดไป
+        href = 1'b1;
+        send_byte(8'h00);
+        send_byte(8'h1F); // pixel ใหม่เป็นน้ำเงิน
+        @(negedge pclk);
+        if (!pixel_valid || pixel_addr != 17'd320 || pixel_data != 12'h00F) begin
+            $display("ERROR: next-row pixel mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
+            $finish;
+        end
+
+        href = 1'b0;
+        @(posedge pclk);
 
         $display("PASS: tb_camera_capture");
         $finish;
