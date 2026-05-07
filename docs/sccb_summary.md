@@ -128,7 +128,7 @@ DONE
 ```text
 {register_address, value}
 {0x12, 0x80}  // reset
-{... , ... }  // RGB565 / QVGA setup
+{... , ... }  // RGB444 / QVGA setup
 ```
 
 แล้วให้ `sccb_master` ไล่เขียนทีละคู่จนหมด

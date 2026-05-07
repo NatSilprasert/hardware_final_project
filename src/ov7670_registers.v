@@ -8,7 +8,7 @@ module ov7670_registers #(
 );
 
     // ตาราง register สำหรับตั้งค่า OV7670 แบบ baseline:
-    // reset -> RGB565 -> QVGA/downsample
+    // reset -> RGB444 -> QVGA/downsample
     localparam REG_COUNT = 20;
 
     assign valid = (index < REG_COUNT);
@@ -22,9 +22,9 @@ module ov7670_registers #(
             5'd2:  reg_word = 16'h1101; // CLKRC : แบ่ง clock ภายในแบบง่าย
             5'd3:  reg_word = 16'h0C0C; // COM3  : enable scaling + DCW
             5'd4:  reg_word = 16'h3E1A; // COM14 : manual scaling + DCW/PCLK + divide by 4
-            5'd5:  reg_word = 16'h40D0; // COM15 : RGB565 + full output range
+            5'd5:  reg_word = 16'h40D0; // COM15 : full output range, RGB444 enabled path
             5'd6:  reg_word = 16'h3A04; // TSLB  : ใช้ลำดับข้อมูลมาตรฐานสำหรับ RGB path
-            5'd7:  reg_word = 16'h8C00; // RGB444: ปิด RGB444 mode เพื่อใช้ RGB565
+            5'd7:  reg_word = 16'h8C03; // RGB444: enable + word format = RG Bx
             5'd8:  reg_word = 16'h1716; // HSTART: ค่าหน้าต่างแนวนอนชุดที่นิยมใช้
             5'd9:  reg_word = 16'h1804; // HSTOP
             5'd10: reg_word = 16'h1902; // VSTRT

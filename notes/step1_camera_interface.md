@@ -9,11 +9,11 @@
 - `src/sccb_master.v`
   ส่งคำสั่ง SCCB ไปตั้งค่ากล้องทีละ register
 - `src/camera_capture.v`
-  รับข้อมูลจาก `D[7:0]`, `PCLK`, `HREF`, `VSYNC` แล้วรวม RGB565 เป็น RGB444
+  รับข้อมูลจาก `D[7:0]`, `PCLK`, `HREF`, `VSYNC` แล้วรวม RGB444
 - `sim/tb_sccb_master.v`
   ทดสอบว่า FSM ของ SCCB วิ่งจนตั้งค่าเสร็จ
 - `sim/tb_camera_capture.v`
-  ทดสอบการรวม 2 byte เป็น 1 pixel และการสร้าง address
+  ทดสอบการรวม 2 byte เป็น 1 pixel RGB444 และการสร้าง address
 
 ## ข้อจำกัดของเวอร์ชันนี้
 

@@ -20,14 +20,6 @@ module camera_capture #(
     reg [8:0]  y_count;
     reg        vsync_d;
 
-    wire [4:0] r5;
-    wire [5:0] g6;
-    wire [4:0] b5;
-
-    assign r5 = first_byte[7:3];
-    assign g6 = {first_byte[2:0], cam_data[7:5]};
-    assign b5 = cam_data[4:0];
-
     always @(posedge pclk) begin
         if (rst) begin
             pixel_addr  <= 17'd0;
@@ -61,10 +53,10 @@ module camera_capture #(
                     byte_phase  <= 1'b0;
                     pixel_valid <= 1'b1;
 
-                    // แปลง RGB565 -> RGB444 เพื่อลดการใช้ BRAM
-                    pixel_data[11:8] <= r5[4:1];
-                    pixel_data[7:4]  <= g6[5:2];
-                    pixel_data[3:0]  <= b5[4:1];
+                    // OV7670 RGB444 word format = RG Bx
+                    pixel_data[11:8] <= first_byte[7:4];
+                    pixel_data[7:4]  <= first_byte[3:0];
+                    pixel_data[3:0]  <= cam_data[7:4];
 
                     pixel_addr <= (y_count * FRAME_WIDTH) + x_count;
 

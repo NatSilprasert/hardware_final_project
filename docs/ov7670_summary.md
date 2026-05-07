@@ -51,35 +51,28 @@ D[7:0] คือข้อมูลภาพทีละ byte
 
 ## Format ภาพที่แนะนำ
 
-แนะนำใช้ `RGB565`
+แนะนำใช้ `RGB444`
 
 เหตุผล:
 
+- ตรงกับ VGA 12-bit RGB ของ Basys 3
+- เก็บใน BRAM ได้พอดี 1 pixel = 12 บิต
 - ทำ grayscale, negative, edge detection ได้ตรงไปตรงมา
-- แปลงไป VGA 12-bit RGB ได้ง่าย
-- 1 pixel ใช้ 2 byte
 
-รูปแบบ RGB565:
+รูปแบบ RGB444:
 
 ```text
-byte 1 = RRRRRGGG
-byte 2 = GGGBBBBB
+word format = RG Bx
+byte 1 = RRRRGGGG
+byte 2 = BBBBxxxx
 ```
 
 แยกสี:
 
 ```text
-R5 = byte1[7:3]
-G6 = {byte1[2:0], byte2[7:5]}
-B5 = byte2[4:0]
-```
-
-แปลงเป็น RGB444 สำหรับ VGA:
-
-```text
-R4 = R5[4:1]
-G4 = G6[5:2]
-B4 = B5[4:1]
+R4 = byte1[7:4]
+G4 = byte1[3:0]
+B4 = byte2[7:4]
 ```
 
 ## Register สำคัญ
@@ -90,7 +83,7 @@ B4 = B5[4:1]
 | --- | --- | --- |
 | `COM7` | `0x12` | reset register, เลือก output format, เลือก QVGA |
 | `CLKRC` | `0x11` | ตั้ง clock divider ภายในกล้อง |
-| `COM15` | `0x40` | ตั้ง RGB565/RGB555 และ range สี |
+| `COM15` | `0x40` | ตั้ง range สีและ RGB output option |
 | `COM3` | `0x0C` | เปิด scaling / downsampling |
 | `COM14` | `0x3E` | คุม PCLK และ manual scaling |
 | `SCALING_XSC` | `0x70` | horizontal scaling |
@@ -160,8 +153,7 @@ OV7670 มี register บางตัวที่ทำ negative หรือ e
 ```text
 PCLK domain:
     อ่าน D[7:0] ตอน HREF = 1
-    รวม 2 byte เป็น 1 pixel RGB565
-    ลดเหลือ RGB444
+    รวม 2 byte เป็น 1 pixel RGB444
     เขียนลง BRAM address 0 ถึง 320*240-1
 
 VGA domain:
