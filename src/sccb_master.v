@@ -1,8 +1,8 @@
 module sccb_master #(
-    parameter CLK_DIVIDER  = 500,
-    parameter START_DELAY  = 30000,
-    parameter RESET_DELAY  = 30000,
-    parameter REG_COUNT    = 165,
+    parameter CLK_DIVIDER  = 5000,
+    parameter START_DELAY  = 1000000,
+    parameter RESET_DELAY  = 1000000,
+    parameter REG_COUNT    = 166,
     parameter SLAVE_ADDR_W = 8'h42
 ) (
     input  wire       clk,
@@ -26,7 +26,7 @@ module sccb_master #(
     localparam ST_DONE         = 4'd9;
 
     reg [3:0] state;
-    reg [15:0] wait_counter;
+    reg [23:0] wait_counter;
     reg [15:0] clk_div_count;
     reg [1:0] phase_index;
     reg [2:0] bit_index;
@@ -52,7 +52,7 @@ module sccb_master #(
     always @(posedge clk) begin
         if (rst) begin
             state           <= ST_POWERUP;
-            wait_counter    <= 16'd0;
+            wait_counter    <= 24'd0;
             clk_div_count   <= 16'd0;
             phase_index     <= 2'd0;
             bit_index       <= 3'd7;
@@ -76,7 +76,7 @@ module sccb_master #(
                     if (wait_counter < START_DELAY - 1) begin
                         wait_counter <= wait_counter + 1'b1;
                     end else begin
-                        wait_counter <= 16'd0;
+                        wait_counter <= 24'd0;
                         state        <= ST_FETCH;
                     end
                 end
@@ -173,7 +173,7 @@ module sccb_master #(
                     scl     <= 1'b1;
                     sda_drive_low <= 1'b0;
                     if (latched_is_reset) begin
-                        wait_counter <= 16'd0;
+                        wait_counter <= 24'd0;
                         state        <= ST_RESET_WAIT;
                     end else begin
                         current_index <= current_index + 1'b1;
@@ -186,7 +186,7 @@ module sccb_master #(
                     if (wait_counter < RESET_DELAY - 1) begin
                         wait_counter <= wait_counter + 1'b1;
                     end else begin
-                        wait_counter  <= 16'd0;
+                        wait_counter  <= 24'd0;
                         current_index <= current_index + 1'b1;
                         state         <= ST_FETCH;
                     end

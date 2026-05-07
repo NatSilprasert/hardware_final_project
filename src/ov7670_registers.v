@@ -10,14 +10,17 @@ module ov7670_registers #(
     // RGB565/QVGA register table adapted from the working Vivado project in
     // project_1.srcs 2. The reference design performs two ID reads first; this
     // ROM keeps only the writes because this project's SCCB master is write-only.
-    localparam REG_COUNT = 165;
+    localparam REG_COUNT = 166;
 
     assign valid = (index < REG_COUNT);
 
     always @(*) begin
         reg_word = 16'hFFFF;
 
-        case (index)
+        if (index == 8'd0) begin
+            reg_word = 16'h1280; // COM7 reset before applying the reference table
+        end else begin
+        case (index - 8'd1)
             8'd0:   reg_word = 16'h1214;
             8'd1:   reg_word = 16'h40D0;
             8'd2:   reg_word = 16'h3A04;
@@ -185,6 +188,7 @@ module ov7670_registers #(
             8'd164: reg_word = 16'h3B42;
             default: reg_word = 16'hFFFF;
         endcase
+        end
     end
 
 endmodule

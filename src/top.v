@@ -122,7 +122,7 @@ module top (
         .clk(vga_clk),
         .rst(sys_rst),
         .mode(sw),
-        .pixel_valid(vga_active_d1 && config_done),
+        .pixel_valid(vga_active_d1),
         .pixel_x(vga_x_d1),
         .pixel_y(vga_y_d1),
         .pixel_in(fb_pixel_data),
@@ -162,7 +162,7 @@ module top (
             vga_hsync_d2  <= vga_hsync_d1;
             vga_vsync_d2  <= vga_vsync_d1;
 
-            if (vga_active_d2 && config_done) begin
+            if (vga_active_d2) begin
                 vga_rgb_d <= filtered_pixel_data;
             end else begin
                 vga_rgb_d <= 12'h000;

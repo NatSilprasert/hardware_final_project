@@ -19,5 +19,6 @@
 
 - `sccb_master` ยังไม่ได้ตรวจ ACK จริงจังจากกล้อง
 - register set ปรับตาม Vivado reference ที่ภาพขึ้นถูกใน `project_1.srcs 2` โดยใช้ RGB565/QVGA table แบบ 165 writes
+- เพิ่ม `COM7 reset` ก่อน register table และชะลอ SCCB ลงใกล้ reference เพื่อกันกล้องไม่รับ config ตอน power-up ยังไม่นิ่ง
 - `camera_capture` sample ที่ `posedge PCLK` และนับ address ทุก 320 pixel เอง เพื่อลดปัญหา frame หลุดเมื่อ timing ของ `HREF` ไม่ตรงกับความกว้างที่ต้องการ
 - ยังไม่มี top module, frame buffer, VGA, หรือ filters
