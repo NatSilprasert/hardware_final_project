@@ -1,3 +1,10 @@
+//============================================================================
+// Module: top
+// Description: Top-level module for the OV7670 + VGA pipeline.
+//              Adapted to current board pin names, but aligned with the
+//              working reference architecture.
+//============================================================================
+
 module top (
     input  wire        clk,
     input  wire        btnC,
@@ -20,154 +27,122 @@ module top (
 );
 
     wire        sys_rst;
-    wire        vga_clk;
-    wire        config_done;
-    wire        sccb_busy;
-    wire [4:0]  sccb_index;
-    wire [16:0] cam_pixel_addr;
-    wire [11:0] cam_pixel_data;
-    wire        cam_pixel_valid;
-    wire        cam_frame_start;
-    wire [16:0] vga_frame_addr;
-    wire [11:0] fb_pixel_data;
-    wire [11:0] filtered_pixel_data;
-    wire        vga_active_raw;
-    wire        vga_hsync_raw;
-    wire        vga_vsync_raw;
-    wire [9:0]  vga_x;
-    wire [9:0]  vga_y;
-    wire [8:0]  image_x;
-    wire [8:0]  image_y;
+    wire        clk_25mhz;
+    wire        clk_24mhz;
+    wire        mmcm_locked;
+    wire        init_done;
+    wire        cam_rst_from_init;
+    wire        sccb_start;
+    wire [7:0]  sccb_addr;
+    wire [7:0]  sccb_data;
+    wire        sccb_done;
+    wire        sccb_scl;
+    wire [16:0] cap_wr_addr;
+    wire [11:0] cap_wr_data;
+    wire        cap_wr_en;
+    wire [16:0] vga_rd_addr;
+    wire [11:0] vga_rd_data;
+    wire [9:0]  hcount;
+    wire [9:0]  vcount;
+    wire        hactive;
+    wire        vactive;
+    wire        hsync_wire;
+    wire        vsync_wire;
+    wire [3:0]  vga_r;
+    wire [3:0]  vga_g;
+    wire [3:0]  vga_b;
 
-    reg         vga_active_d1;
-    reg         vga_hsync_d1;
-    reg         vga_vsync_d1;
-    reg         vga_active_d2;
-    reg         vga_hsync_d2;
-    reg         vga_vsync_d2;
-    reg [9:0]   vga_x_d1;
-    reg [9:0]   vga_y_d1;
-    reg [11:0]  vga_rgb_d;
-    reg         frame_seen_latched;
+    assign sys_rst     = btnC;
+    assign cam_pwdn    = 1'b0;
+    assign cam_reset_n = cam_rst_from_init;
+    assign cam_scl     = sccb_scl;
+    assign cam_xclk    = clk_25mhz;
 
-    assign sys_rst      = btnC;
-    assign cam_pwdn     = 1'b0;
-    assign cam_reset_n  = 1'b1;
-    assign Hsync        = vga_hsync_d2;
-    assign Vsync        = vga_vsync_d2;
-    assign vgaRed       = vga_rgb_d[11:8];
-    assign vgaGreen     = vga_rgb_d[7:4];
-    assign vgaBlue      = vga_rgb_d[3:0];
+    assign Hsync       = hsync_wire;
+    assign Vsync       = vsync_wire;
+    assign vgaRed      = vga_r;
+    assign vgaGreen    = vga_g;
+    assign vgaBlue     = vga_b;
 
-    // LED ใช้ช่วย debug บนบอร์ดจริง
-    assign led[0] = config_done;
-    assign led[1] = frame_seen_latched;
-    assign led[2] = sw[0];
-    assign led[3] = sw[1];
+    assign led[0] = init_done;
+    assign led[1] = cam_vsync;
+    assign led[2] = cam_href;
+    assign led[3] = cam_pclk;
 
-    clock_gen u_clock_gen (
-        .clk_100mhz(clk),
-        .rst(sys_rst),
-        .clk_25mhz(),
-        .vga_clk(vga_clk),
-        .cam_xclk(cam_xclk)
+    ref_clk_wiz u_clk_wiz (
+        .clk_in   (clk),
+        .rst      (sys_rst),
+        .clk_25mhz(clk_25mhz),
+        .clk_24mhz(clk_24mhz),
+        .locked   (mmcm_locked)
     );
 
-    sccb_master u_sccb_master (
-        .clk(clk),
-        .rst(sys_rst),
-        .scl(cam_scl),
-        .sda(cam_sda),
-        .config_done(config_done),
-        .busy(sccb_busy),
-        .current_index(sccb_index)
+    ref_sccb_master u_sccb_master (
+        .clk   (clk),
+        .rst   (sys_rst),
+        .start (sccb_start),
+        .addr  (sccb_addr),
+        .data  (sccb_data),
+        .done  (sccb_done),
+        .scl   (sccb_scl),
+        .sda   (cam_sda)
     );
 
-    camera_capture u_camera_capture (
-        .pclk(cam_pclk),
-        .rst(sys_rst),
+    ref_ov7670_init u_init (
+        .clk        (clk),
+        .rst        (sys_rst),
+        .sccb_start (sccb_start),
+        .sccb_addr  (sccb_addr),
+        .sccb_data  (sccb_data),
+        .sccb_done  (sccb_done),
+        .cam_rst_out(cam_rst_from_init),
+        .init_done  (init_done)
+    );
+
+    ref_ov7670_capture u_capture (
+        .pclk (cam_pclk),
         .vsync(cam_vsync),
-        .href(cam_href),
-        .cam_data(cam_d),
-        .pixel_addr(cam_pixel_addr),
-        .pixel_data(cam_pixel_data),
-        .pixel_valid(cam_pixel_valid),
-        .frame_start(cam_frame_start)
+        .href (cam_href),
+        .d    (cam_d),
+        .addr (cap_wr_addr),
+        .dout (cap_wr_data),
+        .we   (cap_wr_en)
     );
 
-    frame_buffer u_frame_buffer (
-        .wr_clk(cam_pclk),
-        .wr_en(cam_pixel_valid),
-        .wr_addr(cam_pixel_addr),
-        .wr_data(cam_pixel_data),
-        .rd_clk(vga_clk),
-        .rd_addr(vga_frame_addr),
-        .rd_data(fb_pixel_data)
+    ref_frame_buffer u_frame_buffer (
+        .clk_a (cam_pclk),
+        .we_a  (cap_wr_en),
+        .addr_a(cap_wr_addr),
+        .din_a (cap_wr_data),
+        .clk_b (clk_25mhz),
+        .addr_b(vga_rd_addr),
+        .dout_b(vga_rd_data)
     );
 
-    vga_sync u_vga_sync (
-        .pixel_clk(vga_clk),
-        .rst(sys_rst),
-        .hsync(vga_hsync_raw),
-        .vsync(vga_vsync_raw),
-        .active_video(vga_active_raw),
-        .x(vga_x),
-        .y(vga_y),
-        .image_x(image_x),
-        .image_y(image_y),
-        .frame_addr(vga_frame_addr)
+    ref_vga_sync u_vga_sync (
+        .clk       (clk_25mhz),
+        .rst       (sys_rst),
+        .hsync     (hsync_wire),
+        .vsync     (vsync_wire),
+        .hactive   (hactive),
+        .vactive   (vactive),
+        .hcount    (hcount),
+        .vcount    (vcount)
     );
 
-    filter_core u_filter_core (
-        .clk(vga_clk),
-        .rst(sys_rst),
-        .mode(sw),
-        .pixel_valid(vga_active_d1 && config_done),
-        .pixel_x(vga_x_d1),
-        .pixel_y(vga_y_d1),
-        .pixel_in(fb_pixel_data),
-        .pixel_out(filtered_pixel_data)
+    ref_vga_display u_vga_display (
+        .clk     (clk_25mhz),
+        .rst     (sys_rst),
+        .hcount  (hcount),
+        .vcount  (vcount),
+        .hactive (hactive),
+        .vactive (vactive),
+        .sw      (sw),
+        .rd_addr (vga_rd_addr),
+        .rd_data (vga_rd_data),
+        .vga_r   (vga_r),
+        .vga_g   (vga_g),
+        .vga_b   (vga_b)
     );
-
-    always @(posedge cam_pclk) begin
-        if (sys_rst) begin
-            frame_seen_latched <= 1'b0;
-        end else if (cam_frame_start) begin
-            // latch ไว้เพื่อดูบน LED ว่ากล้องเริ่มส่ง frame แล้ว
-            frame_seen_latched <= 1'b1;
-        end
-    end
-
-    always @(posedge vga_clk) begin
-        if (sys_rst) begin
-            vga_active_d1 <= 1'b0;
-            vga_hsync_d1  <= 1'b1;
-            vga_vsync_d1  <= 1'b1;
-            vga_active_d2 <= 1'b0;
-            vga_hsync_d2  <= 1'b1;
-            vga_vsync_d2  <= 1'b1;
-            vga_x_d1      <= 10'd0;
-            vga_y_d1      <= 10'd0;
-            vga_rgb_d    <= 12'h000;
-        end else begin
-            // stage 1: ชดเชย latency ของ frame buffer
-            vga_active_d1 <= vga_active_raw;
-            vga_hsync_d1  <= vga_hsync_raw;
-            vga_vsync_d1  <= vga_vsync_raw;
-            vga_x_d1      <= vga_x;
-            vga_y_d1      <= vga_y;
-
-            // stage 2: ชดเชย latency ของ filter_core
-            vga_active_d2 <= vga_active_d1;
-            vga_hsync_d2  <= vga_hsync_d1;
-            vga_vsync_d2  <= vga_vsync_d1;
-
-            if (vga_active_d2 && config_done) begin
-                vga_rgb_d <= filtered_pixel_data;
-            end else begin
-                vga_rgb_d <= 12'h000;
-            end
-        end
-    end
 
 endmodule
