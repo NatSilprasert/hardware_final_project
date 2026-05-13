@@ -1,170 +1,213 @@
 # SCCB Summary
 
-สรุปนี้ดึงเฉพาะสิ่งที่จำเป็นจาก `SCCBSpec_AN.pdf` สำหรับตั้งค่า OV7670 ด้วย FPGA
+สรุปนี้อธิบายเฉพาะสิ่งที่โปรเจกต์นี้ใช้จริงในโค้ด เพื่อให้ดูแล้วเข้าใจว่า `src/sccb_master.v` ทำอะไร และมันคุยกับ `src/ov7670_registers.v` อย่างไร
 
-## SCCB คืออะไร
+## SCCB ในโปรเจกต์นี้มีหน้าที่อะไร
 
-SCCB คือ Serial Camera Control Bus ของ OmniVision
+SCCB คือ bus สำหรับตั้งค่า register ของ OV7670 ก่อนเริ่มรับภาพ
 
-คิดแบบง่ายที่สุดคือมันคล้าย I2C มาก ใช้สำหรับเขียนค่า register ในกล้อง เช่น เลือก format ภาพ, ตั้ง clock, เปิด scaling
+ในโปรเจกต์นี้ SCCB ไม่ได้ใช้ส่งภาพ และไม่ได้ใช้ read register กลับมาเพื่อตรวจสอบสถานะเป็นหลัก
 
-ในโปรเจกต์นี้:
+หน้าที่ของ `sccb_master` มีแค่นี้:
 
-- FPGA เป็น master
-- OV7670 เป็น slave
-- ใช้ 2 เส้นคือ `SIO_C` และ `SIO_D`
+1. รอให้กล้องนิ่งหลังเปิดเครื่อง
+2. ไล่หยิบคำสั่ง `{register_address, value}` จาก ROM
+3. ส่งออกไปที่ OV7670 ทีละ register ผ่าน `SCL` และ `SDA`
+4. เมื่อส่งครบทั้งหมดแล้วจึงยก `config_done`
 
-## สัญญาณหลัก
+## โมดูลที่เกี่ยวข้อง
 
-| Signal | ความหมาย |
-| --- | --- |
-| `SIO_C` | clock ของ SCCB คล้าย SCL |
-| `SIO_D` | data ของ SCCB คล้าย SDA |
+- `src/sccb_master.v`
+  ตัว master ที่สร้างสัญญาณ SCCB และไล่ส่ง register table
+- `src/ov7670_registers.v`
+  ROM ของค่าที่จะเขียนเข้า OV7670
+- `src/top.v`
+  instantiate `sccb_master` แล้วเอา `config_done` ไปแสดงที่ `led[0]`
 
-`SIO_D` เป็น bidirectional ต้องทำเป็น tri-state ได้ เพราะบางจังหวะ master ต้องปล่อยเส้นนี้
+## สัญญาณที่โค้ดใช้จริง
 
-## Address ของ OV7670
+จาก `src/sccb_master.v`
 
-OV7670 ใช้ device slave address:
+| Signal | ทิศทาง | ใช้ทำอะไร |
+| --- | --- | --- |
+| `clk` | input | clock ระบบ 100 MHz ที่ใช้ขับ FSM ของ SCCB |
+| `rst` | input | reset โมดูล SCCB |
+| `scl` | output | clock ของ SCCB |
+| `sda` | inout | data line แบบ open-drain |
+| `config_done` | output | เป็น `1` เมื่อเขียน register ครบแล้ว |
+| `busy` | output | เป็น `1` ระหว่างกำลัง config |
+| `current_index` | output | index ของ register entry ที่กำลังทำอยู่ |
+
+## พารามิเตอร์ที่ตั้งไว้ในโค้ด
+
+ค่าปัจจุบันใน `src/sccb_master.v` คือ:
 
 ```text
-0x42 = write
-0x43 = read
+CLK_DIVIDER  = 5000
+START_DELAY  = 1000000
+RESET_DELAY  = 1000000
+REG_COUNT    = 172
+SLAVE_ADDR_W = 0x42
 ```
 
-สำหรับโปรเจกต์นี้ ส่วนใหญ่ใช้แค่ write ก็พอ
+ความหมาย:
 
-## รูปแบบการเขียน register
+- `CLK_DIVIDER = 5000`
+  ใช้หาร clock 100 MHz เพื่อให้ SCL ช้าและปลอดภัย
+  ในคอมเมนต์ระบุว่าเป็น half-period 50 us
+- `START_DELAY = 1000000`
+  รอประมาณ 10 ms หลัง reset ก่อนเริ่มคุยกับกล้อง
+- `RESET_DELAY = 1000000`
+  รอประมาณ 10 ms หลังส่ง `COM7 reset`
+- `REG_COUNT = 172`
+  จำนวน entry ที่ ROM report ว่า valid
+- `SLAVE_ADDR_W = 0x42`
+  slave address ฝั่ง write ของ OV7670
 
-การเขียน register หนึ่งตัวใช้ 3 phase:
+## การขับ `SDA` ในโค้ด
 
-```text
-phase 1: device address
-phase 2: register address หรือ sub-address
-phase 3: data ที่จะเขียน
+โค้ดใช้แนว open-drain แบบง่าย:
+
+```verilog
+assign sda = sda_drive_low ? 1'b0 : 1'bz;
 ```
 
-ตัวอย่าง:
+แปลว่า:
+
+- ถ้า `sda_drive_low = 1` โมดูลจะดึงเส้น `SDA` ลง `0`
+- ถ้า `sda_drive_low = 0` โมดูลจะปล่อยเส้นเป็น high-Z
+
+ดังนั้นค่าระดับ `1` บนบัสไม่ได้มาจาก master drive เอง แต่มาจากการปล่อยเส้นและให้ pull-up ทำงาน
+
+## รูปแบบ transaction ที่โค้ดส่ง
+
+สำหรับ register 1 ตัว โค้ดจะส่ง 3 byte:
 
 ```text
-เขียน register 0x12 ด้วยค่า 0x80
+0x42 -> register address -> register value
+```
 
-ส่ง:
+ตัวอย่างเช่น reset กล้อง:
+
+```text
 0x42 -> 0x12 -> 0x80
 ```
 
-ความหมายคือบอกกล้องว่า:
+## FSM ที่ใช้จริงใน `sccb_master`
+
+สถานะหลักที่มีอยู่ในโค้ด:
 
 ```text
-ฉันจะเขียนค่า 0x80 ไปที่ register 0x12
+ST_POWERUP
+ST_FETCH
+ST_START_0
+ST_START_1
+ST_SEND_BIT_LO
+ST_SEND_BIT_HI
+ST_ACK_LO
+ST_ACK_HI
+ST_NEXT_BYTE
+ST_STOP_LO
+ST_STOP_HI
+ST_STOP_REL
+ST_BUS_FREE
+ST_RESET_WAIT
+ST_DONE
 ```
 
-## 1 phase มีอะไรบ้าง
+หน้าที่แต่ละช่วง:
 
-1 phase มี 9 bit:
+- `ST_POWERUP`
+  รอ `START_DELAY` ก่อนเริ่ม config
+- `ST_FETCH`
+  อ่าน entry ปัจจุบันจาก `ov7670_registers`
+- `ST_START_0`, `ST_START_1`
+  สร้าง start condition
+- `ST_SEND_BIT_LO`, `ST_SEND_BIT_HI`
+  ส่ง data ทีละบิต โดยเปลี่ยน `SDA` ตอน `SCL=0` และให้ slave sample ตอน `SCL=1`
+- `ST_ACK_LO`, `ST_ACK_HI`
+  ปล่อย `SDA` ในบิตที่ 9
+- `ST_NEXT_BYTE`
+  เลือกว่าจะส่ง byte ถัดไปเป็น register address, register value หรือไป stop
+- `ST_STOP_LO`, `ST_STOP_HI`, `ST_STOP_REL`
+  สร้าง stop condition
+- `ST_BUS_FREE`
+  เว้น bus idle ระหว่าง transaction
+- `ST_RESET_WAIT`
+  รอเพิ่มหลังส่ง `COM7 reset`
+- `ST_DONE`
+  ยก `config_done=1` และ `busy=0`
+
+## การจัดการ ACK ในโค้ด
+
+จุดสำคัญคือโค้ด “ปล่อย” `SDA` ในช่วง ACK แต่ยังไม่ได้ “ตรวจ” ค่าที่ slave ตอบกลับจริง
+
+พฤติกรรมปัจจุบันคือ:
+
+- มี state `ST_ACK_LO` และ `ST_ACK_HI`
+- master ปล่อย `SDA`
+- แต่ไม่มี logic อ่านค่า `sda` มาเช็กว่า ACK เป็น `0` หรือไม่
+
+ดังนั้น implementation นี้เป็น write-only baseline ที่เน้นให้กล้องถูก config ได้ก่อน
+
+## ROM register ทำงานยังไง
+
+`sccb_master` ไม่ได้มี table อยู่ในตัวเอง แต่ไปอ่านจาก `ov7670_registers`
+
+interface คือ:
 
 ```text
-8 data bits + 1 don't-care bit
+input  index
+output reg_word
+output valid
 ```
 
-ส่ง MSB ก่อนเสมอ:
+โดย `reg_word` เก็บข้อมูลแบบ:
 
 ```text
-bit 7, bit 6, bit 5, ..., bit 0, X
+reg_word[15:8] = register address
+reg_word[7:0]  = register value
 ```
 
-`X` คือ don't-care bit สำหรับ write phase
+แล้ว `current_index` จะไล่จาก `0` ขึ้นไปเรื่อย ๆ จน `valid=0`
 
-ใน implementation เบื้องต้น master สามารถปล่อยหรือ ignore bit ที่ 9 ได้ ตามแนวทาง SCCB
+## การ detect ว่า entry ไหนเป็น reset
 
-## Timing แบบง่าย
-
-Datasheet บอกว่า single bit transmission cycle `tCYC` typical คือ `10 us`
-
-แปลว่า SCCB ไม่ต้องเร็วมาก ทำ clock ประมาณ `100 kHz` ก็เข้าใจง่ายและปลอดภัย
-
-หลักง่าย ๆ:
-
-- เปลี่ยนค่า `SIO_D` ตอน `SIO_C = 0`
-- ให้กล้องอ่านค่าตอน `SIO_C = 1`
-- ตอน idle ให้ `SIO_C = 1`
-- `SIO_D` ควรอยู่ high หรือ tri-state ตามจังหวะ
-
-## Start และ stop ใน 2-wire SCCB
-
-OV7670 module ใช้ 2-wire SCCB ไม่มี `SCCB_E` ภายนอก
-
-แนวคิดคล้าย I2C:
+ใน `ST_FETCH` โค้ดจะเช็กว่า entry ปัจจุบันคือ:
 
 ```text
-start: SIO_D เปลี่ยนจาก 1 เป็น 0 ขณะ SIO_C = 1
-stop:  SIO_D เปลี่ยนจาก 0 เป็น 1 ขณะ SIO_C = 1
+register = 0x12
+value    = 0x80
 ```
 
-แม้เอกสาร SCCB จะอธิบาย 3-wire ด้วย แต่สำหรับ OV7670 module ที่ใช้ในงานนี้ให้โฟกัส 2-wire
+ถ้าใช่ จะตั้ง `latched_is_reset`
 
-## สิ่งที่ SCCB module ต้องทำ
+หลังส่ง transaction นี้เสร็จและผ่าน `ST_BUS_FREE` แล้ว state machine จะไม่ไป entry ถัดไปทันที แต่จะเข้า `ST_RESET_WAIT` เพื่อรอ `RESET_DELAY`
 
-ควรทำ FSM ประมาณนี้:
+นี่คือเหตุผลที่โค้ดรองรับกรณี “ต้องหยุดหลัง COM7 reset” โดยอัตโนมัติ
+
+## `config_done` ใช้ทำอะไรในระบบ
+
+ใน `src/top.v`
+
+- `config_done` ถูกต่อไปที่ `led[0]`
+- ใช้เป็นสัญญาณบอกว่า SCCB เขียน register ครบแล้ว
+
+สรุปเชิงระบบคือ ถ้า `led[0]` ไม่ติด แปลว่า configuration ฝั่งกล้องยังไม่จบ หรือ `sccb_master` ยังไม่วิ่งถึง `ST_DONE`
+
+## สิ่งที่โค้ดนี้ยังไม่ได้ทำ
+
+เพื่อไม่ให้ summary สวยเกินจริง ส่วนนี้คือข้อจำกัดของ implementation ปัจจุบัน:
+
+- ยังไม่ตรวจ ACK จริงจาก OV7670
+- ยังไม่มี read transaction เช่นอ่าน `PID` / `VER`
+- ยังไม่มี retry ถ้าการเขียนล้มเหลว
+- ใช้ ROM table แบบคงที่ ไม่ได้เปลี่ยน config ตาม switch หรือ mode runtime
+
+## สรุปสั้นที่สุด
+
+ถ้าจะอธิบาย `sccb_master` แบบประโยคเดียว:
 
 ```text
-IDLE
-START
-SEND_DEVICE_ADDR
-IGNORE_OR_RELEASE_9TH_BIT
-SEND_REGISTER_ADDR
-IGNORE_OR_RELEASE_9TH_BIT
-SEND_REGISTER_VALUE
-IGNORE_OR_RELEASE_9TH_BIT
-STOP
-NEXT_REGISTER
-DONE
+มันคือ FSM ที่ค่อย ๆ ส่ง register table 172 entries ไปยัง OV7670 ผ่าน SCCB โดยมี power-up delay, post-reset delay, และสัญญาณ config_done ปิดงานเมื่อเขียนครบ
 ```
-
-## Register table
-
-ควรสร้าง ROM หรือ array ของ register configuration เช่น:
-
-```text
-{register_address, value}
-{0x12, 0x80}  // reset
-{... , ... }  // RGB565 / QVGA setup
-```
-
-แล้วให้ `sccb_master` ไล่เขียนทีละคู่จนหมด
-
-## Read จำเป็นไหม
-
-ไม่จำเป็นสำหรับ baseline
-
-แต่ read มีประโยชน์ตอน debug เช่นอ่าน `PID` และ `VER`:
-
-```text
-PID = register 0x0A
-VER = register 0x0B
-```
-
-ถ้าอ่านได้ถูก แปลว่า SCCB ติดต่อกล้องได้จริง
-
-สำหรับงานแรกให้ทำ write ให้สำเร็จก่อน
-
-## ข้อควรระวัง
-
-- `SIO_D` ต้องเป็น `inout` และควบคุม output enable ให้ถูก
-- ต้องมี pull-up หรือวงจรที่ทำให้ line กลับเป็น high ได้
-- หลัง reset กล้องควรรอสักพักก่อนเริ่ม SCCB config
-- หลังเขียน `COM7 reset` ควรรออีกช่วงหนึ่งก่อนเขียน config ถัดไป
-- อย่าส่ง SCCB เร็วเกินไป เริ่มที่ประมาณ 100 kHz ง่ายกว่า
-
-## สรุปสำหรับ implementation
-
-สำหรับโปรเจกต์นี้ SCCB มีหน้าที่เดียว:
-
-```text
-ตอนเปิดเครื่อง:
-    reset กล้อง
-    เขียน register config ผ่าน SCCB
-    เมื่อ config เสร็จ ค่อยเริ่ม capture ภาพ
-```
-
-SCCB ไม่ได้ส่งภาพ ภาพจริงออกทาง `D[7:0]`, `PCLK`, `HREF`, `VSYNC`

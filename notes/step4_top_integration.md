@@ -5,7 +5,7 @@
 ## มีอะไรบ้าง
 
 - `src/clock_gen.v`
-  สร้าง clock 25 MHz จาก clock 100 MHz ของ Basys 3
+  สร้าง clock 25 MHz จาก clock 100 MHz ของ Basys 3 ด้วย MMCM + BUFG และขับ `cam_xclk` ด้วย ODDR
 - `src/top.v`
   รวม SCCB, camera capture, frame buffer, VGA timing และ output VGA
 - `constraints/basys3_ov7670_vga.xdc`
@@ -15,9 +15,9 @@
 
 - ใช้ `cam_pclk` เป็น clock ฝั่งเขียน frame buffer
 - ใช้ `vga_clk` 25 MHz เป็น clock ฝั่งอ่าน frame buffer
-- ใช้ `config_done` เป็นเงื่อนไขก่อนปล่อยภาพออก VGA
-- หน่วงสัญญาณ VGA ออก 1 clock เพื่อชดเชย read latency ของ frame buffer
-- ตอนนี้ยังแสดง raw video เท่านั้น ยังไม่ผ่าน filter
+- ใช้ `mmcm_locked` รวมกับ `btnC` เพื่อสร้าง `sys_rst`
+- หน่วงสัญญาณ VGA ออก 2 stage: stage แรกชดเชย BRAM read latency, stage ที่สองชดเชย `filter_core`
+- ทุกโหมดภาพอ่านผ่าน BRAM และผ่าน `filter_core` แล้ว โดยเลือกโหมดจาก `sw[1:0]`
 
 ## LED debug
 
@@ -27,6 +27,6 @@
 
 ## ข้อจำกัดของเวอร์ชันนี้
 
-- `clock_gen` ยังเป็น divider แบบง่าย ไม่ได้ใช้ PLL/MMCM
-- top ยังไม่ใช้ switch เลือก filter
-- ยังไม่ได้รัน Vivado synthesis ในเครื่องนี้ เพราะไม่มี `vivado` ติดตั้งอยู่ใน environment ตอนนี้
+- `frame_seen_latched` ถูกตั้งใน `cam_pclk` domain แล้วส่งไป LED ตรง ๆ จึงเป็น debug path ที่ยังไม่มี synchronizer กลับมาฝั่งระบบ
+- XDC ล่าสุดเพิ่ม `create_clock` ให้ `cam_pclk`, จัด clock groups เป็น asynchronous, และใส่ `CLOCK_DEDICATED_ROUTE FALSE` สำหรับ input `cam_pclk`
+- ยังไม่ได้ยืนยันด้วย Vivado implementation ใน environment นี้ว่าข้อจำกัด clock/pin ใหม่ผ่านครบทุกอย่าง

@@ -10,7 +10,7 @@ module ov7670_registers #(
     // RGB565/QVGA register table adapted from the working Vivado project in
     // project_1.srcs 2. The reference design performs two ID reads first; this
     // ROM keeps only the writes because this project's SCCB master is write-only.
-    localparam REG_COUNT = 166;
+    localparam REG_COUNT = 172;
 
     assign valid = (index < REG_COUNT);
 
@@ -21,7 +21,7 @@ module ov7670_registers #(
             reg_word = 16'h1280; // COM7 reset before applying the reference table
         end else begin
         case (index - 8'd1)
-            8'd0:   reg_word = 16'h1214;
+            8'd0:   reg_word = 16'h1214; // COM7: QVGA + RGB (normal mode)
             8'd1:   reg_word = 16'h40D0;
             8'd2:   reg_word = 16'h3A04;
             8'd3:   reg_word = 16'h3DC8;
@@ -33,12 +33,12 @@ module ov7670_registers #(
             8'd9:   reg_word = 16'h1902;
             8'd10:  reg_word = 16'h1A7A;
             8'd11:  reg_word = 16'h030A;
-            8'd12:  reg_word = 16'h0C00;
-            8'd13:  reg_word = 16'h3E00;
-            8'd14:  reg_word = 16'h7000;
-            8'd15:  reg_word = 16'h7100;
+            8'd12:  reg_word = 16'h0C04; // COM3: enable scaling/DCW for QVGA
+            8'd13:  reg_word = 16'h3E19; // COM14: PCLK div=2, manual scaling enable
+            8'd14:  reg_word = 16'h703A; // SCALING_XSC: horizontal scale factor
+            8'd15:  reg_word = 16'h7135; // SCALING_YSC: vertical scale factor
             8'd16:  reg_word = 16'h7211;
-            8'd17:  reg_word = 16'h7300;
+            8'd17:  reg_word = 16'h73F1; // SCALING_PCLK_DIV: DSP clock divider
             8'd18:  reg_word = 16'hA202;
             8'd19:  reg_word = 16'h1180;
             8'd20:  reg_word = 16'h7A20;
@@ -186,6 +186,13 @@ module ov7670_registers #(
             8'd162: reg_word = 16'h7926;
             8'd163: reg_word = 16'h0903;
             8'd164: reg_word = 16'h3B42;
+            // --- Sharpness / Edge enhancement ---
+            8'd165: reg_word = 16'h3F05; // EDGE: edge enhancement factor = 5
+            8'd166: reg_word = 16'h7519; // REG75: edge enhancement lower limit
+            8'd167: reg_word = 16'h7611; // REG76: edge + white/black pixel correct
+            8'd168: reg_word = 16'h4C04; // DNSTH: de-noise threshold (lower=sharper)
+            8'd169: reg_word = 16'h4108; // COM16: enable edge enhancement
+            8'd170: reg_word = 16'h5640; // CONTRAS: contrast center point
             default: reg_word = 16'hFFFF;
         endcase
         end

@@ -1,9 +1,9 @@
 module frame_buffer #(
-    parameter FRAME_WIDTH = 320,
+    parameter FRAME_WIDTH  = 320,
     parameter FRAME_HEIGHT = 240,
-    parameter ADDR_WIDTH = 17,
-    parameter DATA_WIDTH = 12,
-    parameter DEPTH = 76800
+    parameter ADDR_WIDTH   = 17,
+    parameter DATA_WIDTH   = 12,
+    parameter DEPTH        = 76800
 ) (
     input  wire                   wr_clk,
     input  wire                   wr_en,
@@ -14,22 +14,19 @@ module frame_buffer #(
     output reg  [DATA_WIDTH-1:0]  rd_data
 );
 
-    reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
+    (* ram_style = "block" *) reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
 
     always @(posedge wr_clk) begin
-        // เขียนข้อมูลจากฝั่งกล้องลงหน่วยความจำเมื่อมี pixel valid
         if (wr_en && (wr_addr < DEPTH)) begin
             mem[wr_addr] <= wr_data;
         end
     end
 
     always @(posedge rd_clk) begin
-        // อ่านข้อมูลตาม clock ฝั่ง VGA
-        if (rd_addr < DEPTH) begin
+        if (rd_addr < DEPTH)
             rd_data <= mem[rd_addr];
-        end else begin
+        else
             rd_data <= {DATA_WIDTH{1'b0}};
-        end
     end
 
 endmodule

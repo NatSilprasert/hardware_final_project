@@ -56,3 +56,13 @@ set_property -dict { PACKAGE_PIN A14 IOSTANDARD LVCMOS33 } [get_ports cam_scl]
 set_property -dict { PACKAGE_PIN A15 IOSTANDARD LVCMOS33 PULLUP true } [get_ports cam_sda]
 set_property -dict { PACKAGE_PIN B15 IOSTANDARD LVCMOS33 } [get_ports cam_vsync]
 set_property -dict { PACKAGE_PIN C15 IOSTANDARD LVCMOS33 } [get_ports cam_xclk]
+
+## Camera PCLK as an input clock (~25 MHz)
+create_clock -name cam_pclk_pin -period 40.00 [get_ports cam_pclk]
+## PCLK and sys_clk are asynchronous
+set_clock_groups -asynchronous \
+    -group [get_clocks sys_clk_pin] \
+    -group [get_clocks cam_pclk_pin] \
+    -group [get_clocks -of_objects [get_pins u_clock_gen/u_mmcm/CLKOUT0]]
+## Allow PCLK on non-dedicated clock routing (Pmod pin is not on a clock-capable input)
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets cam_pclk_IBUF]

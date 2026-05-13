@@ -1,28 +1,37 @@
 module clock_gen (
     input  wire clk_100mhz,
     input  wire rst,
-    output reg  clk_25mhz,
+    output wire clk_25mhz,
     output wire vga_clk,
-    output wire cam_xclk
+    output wire cam_xclk,
+    output wire locked
 );
-
-    reg [1:0] div_count;
-
-    always @(posedge clk_100mhz) begin
-        if (rst) begin
-            div_count <= 2'd0;
-            clk_25mhz <= 1'b0;
-        end else begin
-            // หาร 100 MHz ลงมาเป็น 25 MHz แบบง่ายด้วยตัวนับ 2 บิต
-            div_count <= div_count + 1'b1;
-            if (div_count == 2'd1) begin
-                clk_25mhz <= ~clk_25mhz;
-                div_count <= 2'd0;
-            end
-        end
-    end
-
-    assign vga_clk  = clk_25mhz;
-    assign cam_xclk = clk_25mhz;
-
+    wire clk_fb;
+    wire clk_25mhz_unbuf;
+    
+    // MMCME2_BASE: 100 MHz in → 25 MHz out
+    // VCO = 100 * 10/1 = 1000 MHz, output = 1000/40 = 25 MHz
+    MMCME2_BASE #(
+        .CLKIN1_PERIOD(10.0),
+        .CLKFBOUT_MULT_F(10.0),
+        .CLKOUT0_DIVIDE_F(40.0)
+    ) u_mmcm (
+        .CLKIN1(clk_100mhz),
+        .RST(rst),
+        .CLKFBOUT(clk_fb),
+        .CLKFBIN(clk_fb),
+        .CLKOUT0(clk_25mhz_unbuf),
+        .LOCKED(locked),
+        .PWRDWN(1'b0)
+    );
+    
+    BUFG u_bufg (.I(clk_25mhz_unbuf), .O(clk_25mhz));
+    
+    // Use ODDR to drive cam_xclk on an output buffer (cleaner than fabric routing)
+    ODDR #(.DDR_CLK_EDGE("OPPOSITE_EDGE")) u_oddr (
+        .Q(cam_xclk), .C(clk_25mhz), .CE(1'b1),
+        .D1(1'b1), .D2(1'b0), .R(1'b0), .S(1'b0)
+    );
+    
+    assign vga_clk = clk_25mhz;
 endmodule

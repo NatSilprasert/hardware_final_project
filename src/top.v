@@ -19,8 +19,8 @@ module top (
     output wire        cam_xclk
 );
 
-    wire        sys_rst;
     wire        vga_clk;
+    wire        mmcm_locked;
     wire        config_done;
     wire        sccb_busy;
     wire [7:0]  sccb_index;
@@ -39,6 +39,8 @@ module top (
     wire [8:0]  image_x;
     wire [8:0]  image_y;
 
+    wire sys_rst = btnC | ~mmcm_locked;
+
     reg         vga_active_d1;
     reg         vga_hsync_d1;
     reg         vga_vsync_d1;
@@ -50,7 +52,6 @@ module top (
     reg [11:0]  vga_rgb_d;
     reg         frame_seen_latched;
 
-    assign sys_rst      = btnC;
     assign cam_pwdn     = 1'b0;
     assign cam_reset_n  = 1'b1;
     assign Hsync        = vga_hsync_d2;
@@ -59,20 +60,22 @@ module top (
     assign vgaGreen     = vga_rgb_d[7:4];
     assign vgaBlue      = vga_rgb_d[3:0];
 
-    // LED ใช้ช่วย debug บนบอร์ดจริง
     assign led[0] = config_done;
     assign led[1] = frame_seen_latched;
     assign led[2] = sw[0];
     assign led[3] = sw[1];
 
+    // ----- Clock generator (MMCM) -----
     clock_gen u_clock_gen (
         .clk_100mhz(clk),
-        .rst(sys_rst),
+        .rst(btnC),
         .clk_25mhz(),
         .vga_clk(vga_clk),
-        .cam_xclk(cam_xclk)
+        .cam_xclk(cam_xclk),
+        .locked(mmcm_locked)
     );
 
+    // ----- SCCB master -----
     sccb_master u_sccb_master (
         .clk(clk),
         .rst(sys_rst),
@@ -86,6 +89,7 @@ module top (
     camera_capture u_camera_capture (
         .pclk(cam_pclk),
         .rst(sys_rst),
+        .test_mode(1'b0),
         .vsync(cam_vsync),
         .href(cam_href),
         .cam_data(cam_d),
@@ -95,6 +99,7 @@ module top (
         .frame_start(cam_frame_start)
     );
 
+    // ----- Frame buffer -----
     frame_buffer u_frame_buffer (
         .wr_clk(cam_pclk),
         .wr_en(cam_pixel_valid),
@@ -105,6 +110,7 @@ module top (
         .rd_data(fb_pixel_data)
     );
 
+    // ----- VGA timing -----
     vga_sync u_vga_sync (
         .pixel_clk(vga_clk),
         .rst(sys_rst),
@@ -118,6 +124,7 @@ module top (
         .frame_addr(vga_frame_addr)
     );
 
+    // ----- Filter core -----
     filter_core u_filter_core (
         .clk(vga_clk),
         .rst(sys_rst),
@@ -129,15 +136,16 @@ module top (
         .pixel_out(filtered_pixel_data)
     );
 
+    // ----- Frame-seen latch (LED debug) -----
     always @(posedge cam_pclk) begin
-        if (sys_rst) begin
+        if (sys_rst)
             frame_seen_latched <= 1'b0;
-        end else if (cam_frame_start) begin
-            // latch ไว้เพื่อดูบน LED ว่ากล้องเริ่มส่ง frame แล้ว
+        else if (cam_frame_start)
             frame_seen_latched <= 1'b1;
-        end
     end
 
+    // ----- VGA output pipeline -----
+    // All modes now go through BRAM (no more VGA-direct bypass)
     always @(posedge vga_clk) begin
         if (sys_rst) begin
             vga_active_d1 <= 1'b0;
@@ -148,25 +156,24 @@ module top (
             vga_vsync_d2  <= 1'b1;
             vga_x_d1      <= 10'd0;
             vga_y_d1      <= 10'd0;
-            vga_rgb_d    <= 12'h000;
+            vga_rgb_d     <= 12'h000;
         end else begin
-            // stage 1: ชดเชย latency ของ frame buffer
+            // Stage 1: BRAM read latency
             vga_active_d1 <= vga_active_raw;
             vga_hsync_d1  <= vga_hsync_raw;
             vga_vsync_d1  <= vga_vsync_raw;
             vga_x_d1      <= vga_x;
             vga_y_d1      <= vga_y;
 
-            // stage 2: ชดเชย latency ของ filter_core
+            // Stage 2: filter latency
             vga_active_d2 <= vga_active_d1;
             vga_hsync_d2  <= vga_hsync_d1;
             vga_vsync_d2  <= vga_vsync_d1;
 
-            if (vga_active_d2) begin
+            if (vga_active_d2)
                 vga_rgb_d <= filtered_pixel_data;
-            end else begin
+            else
                 vga_rgb_d <= 12'h000;
-            end
         end
     end
 

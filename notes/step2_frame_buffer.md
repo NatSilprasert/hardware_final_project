@@ -15,8 +15,9 @@
 - ฝั่งอ่านใช้ `rd_clk` จาก VGA
 - เก็บข้อมูลต่อพิกเซลเป็น `RGB444` ขนาด 12 บิต
 - address ใช้รูปแบบ `y * 320 + x`
+- เวอร์ชันล่าสุดใส่ `(* ram_style = "block" *)` เพื่อบอก synthesis ให้ map ไป BRAM ชัดขึ้น
 
 ## ข้อจำกัดของเวอร์ชันนี้
 
-- เวอร์ชันนี้ใช้ behavioral memory เพื่อให้ simulation และโครงสร้างรวมชัดก่อน
-- ตอน integrate กับ Vivado ภายหลังอาจต้องดูว่า synthesis map เป็น BRAM ตามที่ต้องการหรือไม่
+- โค้ดยังเป็น behavioral dual-port memory แต่ตั้งใจให้ Vivado infer เป็น block RAM
+- ยังไม่ได้มี logic ป้องกัน read-during-write collision เกินกว่าพฤติกรรมปกติของ dual-clock RAM
