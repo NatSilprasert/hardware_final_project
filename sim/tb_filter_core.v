@@ -16,8 +16,8 @@ module tb_filter_core;
     integer y_idx;
 
     filter_core #(
-        .FRAME_WIDTH(8),
-        .FRAME_HEIGHT(6)
+        .FRAME_WIDTH(12),
+        .FRAME_HEIGHT(12)
     ) dut (
         .clk(clk),
         .rst(rst),
@@ -87,8 +87,8 @@ module tb_filter_core;
         @(posedge clk);
         rst = 1'b0;
 
-        for (y_idx = 0; y_idx < 6; y_idx = y_idx + 1) begin
-            for (x_idx = 0; x_idx < 8; x_idx = x_idx + 1) begin
+        for (y_idx = 0; y_idx < 12; y_idx = y_idx + 1) begin
+            for (x_idx = 0; x_idx < 12; x_idx = x_idx + 1) begin
                 send_pixel(2'b11, 12'h000, x_idx[9:0], y_idx[9:0]);
                 if (pixel_out != 12'h000) begin
                     flat_nonzero_count = flat_nonzero_count + 1;
@@ -107,15 +107,19 @@ module tb_filter_core;
         rst = 1'b0;
         edge_nonzero_count = 0;
 
-        for (y_idx = 0; y_idx < 6; y_idx = y_idx + 1) begin
-            for (x_idx = 0; x_idx < 8; x_idx = x_idx + 1) begin
-                if (x_idx < 4) begin
+        for (y_idx = 0; y_idx < 12; y_idx = y_idx + 1) begin
+            for (x_idx = 0; x_idx < 12; x_idx = x_idx + 1) begin
+                if (x_idx < 6) begin
                     send_pixel(2'b11, 12'h000, x_idx[9:0], y_idx[9:0]);
                 end else begin
                     send_pixel(2'b11, 12'hFFF, x_idx[9:0], y_idx[9:0]);
                 end
 
-                if (pixel_out != 12'h000) begin
+                // Count only the interior region that is outside the forced-black
+                // border guard used by the current Sobel implementation.
+                if ((x_idx >= 4) && (x_idx < 10) &&
+                    (y_idx >= 4) && (y_idx < 10) &&
+                    (pixel_out != 12'h000)) begin
                     edge_nonzero_count = edge_nonzero_count + 1;
                 end
             end

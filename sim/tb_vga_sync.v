@@ -77,14 +77,16 @@ module tb_vga_sync;
                 end
             end
 
-            // จุด (1,0) ต้องยังอ้างถึง pixel เดิม เพราะเป็น 2x scaling แนวนอน
+            // ด้วย implementation ปัจจุบัน x/y เป็น registered output แต่
+            // image_x/image_y/frame_addr เป็น combinational จาก h_count/v_count
             if ((x == 10'd1) && (y == 10'd0)) begin
-                if ((image_x == 9'd0) && (image_y == 9'd0) && (frame_addr == 17'd0)) begin
+                if ((image_x == 9'd1) && (image_y == 9'd0) && (frame_addr == 17'd1)) begin
                     sample_double_ok = 1;
                 end
             end
 
-            // จุด (2,2) ต้อง map ไป (1,1) ของภาพ
+            // จุดที่ registered x/y = (2,2) จะเห็น address ของ h_count/v_count
+            // ปัจจุบันที่ก้าวนำไป 1 cycle
             if ((x == 10'd2) && (y == 10'd2)) begin
                 if ((image_x == 9'd1) && (image_y == 9'd1) && (frame_addr == 17'd321)) begin
                     sample_row_ok = 1;

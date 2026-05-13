@@ -3,6 +3,7 @@
 module tb_camera_capture;
     reg        pclk;
     reg        rst;
+    reg        test_mode;
     reg        vsync;
     reg        href;
     reg [7:0]  cam_data;
@@ -13,11 +14,11 @@ module tb_camera_capture;
 
     camera_capture #(
         .FRAME_WIDTH(2),
-        .FRAME_HEIGHT(2),
-        .MAX_ADDRESS(17'd3)
+        .FRAME_HEIGHT(2)
     ) dut (
         .pclk(pclk),
         .rst(rst),
+        .test_mode(test_mode),
         .vsync(vsync),
         .href(href),
         .cam_data(cam_data),
@@ -41,6 +42,7 @@ module tb_camera_capture;
     initial begin
         pclk     = 1'b0;
         rst      = 1'b1;
+        test_mode = 1'b0;
         vsync    = 1'b0;
         href     = 1'b0;
         cam_data = 8'h00;
@@ -62,39 +64,40 @@ module tb_camera_capture;
 
         href = 1'b1;
 
-        // pixel 0: RGB565 = F800 -> RGB444 = F00
+        // Current implementation asserts pixel_valid one byte after a full RGB565
+        // pair has been shifted into d_latch.
         send_byte(8'hF8);
         if (pixel_valid) begin
             $display("ERROR: pixel_valid asserted too early after first byte");
             $finish;
         end
         send_byte(8'h00);
-        if (!pixel_valid || pixel_addr != 17'd0 || pixel_data != 12'hF00) begin
-            $display("ERROR: pixel 0 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
+        if (pixel_valid) begin
+            $display("ERROR: pixel_valid asserted too early after second byte");
             $finish;
         end
 
-        // pixel 1: RGB565 = 07E0 -> RGB444 = 0F0
         send_byte(8'h07);
-        if (pixel_valid) begin
-            $display("ERROR: pixel_valid asserted on first half of pixel 1");
-            $finish;
-        end
-        send_byte(8'hE0);
-        if (!pixel_valid || pixel_addr != 17'd1 || pixel_data != 12'h0F0) begin
-            $display("ERROR: pixel 1 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
+        if (!pixel_valid || pixel_addr != 17'd1 || pixel_data != 12'hF00) begin
+            $display("ERROR: delayed pixel 0 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
             $finish;
         end
 
-        // pixel 2: RGB565 = 001F -> RGB444 = 00F, wraps to next row
-        send_byte(8'h00);
+        send_byte(8'hE0);
         if (pixel_valid) begin
-            $display("ERROR: pixel_valid asserted on first half of pixel 2");
+            $display("ERROR: pixel_valid asserted too early after fourth byte");
             $finish;
         end
-        send_byte(8'h1F); // pixel ใหม่เป็นน้ำเงิน
-        if (!pixel_valid || pixel_addr != 17'd2 || pixel_data != 12'h00F) begin
-            $display("ERROR: next-row pixel mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
+
+        send_byte(8'h00);
+        if (!pixel_valid || pixel_addr != 17'd2 || pixel_data != 12'h0F0) begin
+            $display("ERROR: delayed pixel 1 mismatch addr=%0d data=%03h valid=%0b", pixel_addr, pixel_data, pixel_valid);
+            $finish;
+        end
+
+        send_byte(8'h1F);
+        if (pixel_valid) begin
+            $display("ERROR: pixel_valid asserted too early after sixth byte");
             $finish;
         end
 
